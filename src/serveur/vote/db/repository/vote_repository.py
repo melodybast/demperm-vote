@@ -1,4 +1,6 @@
 from app.neo4j_config import get_driver
+from uuid import *
+from typing import List
 
 class VoteRepository:
     """
@@ -56,3 +58,19 @@ class VoteRepository:
             domain=vote["domain"],
             createdAt=vote["createdAt"].isoformat(),
         )
+
+    def get_votes_to_user(user_id: uuid4) -> List:
+        drv = get_driver()
+        with drv.session() as session:
+            return session.execute_read(VoteRepository._get_votes_to_user_tx, user_id)
+
+    def _get_votes_to_user_tx(tx, user_id: str):
+        res = tx.run(
+            """
+            MATCH (src:User)-[vote:VOTED]->(dst:User {id: $dst_id})
+            RETURN vote
+            """,
+            dst_id=user_id
+        )
+        print(res)
+        return res

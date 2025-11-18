@@ -17,8 +17,10 @@ Including another URLconf
 from django.urls import path
 from api.vote_controller import VoteView
 from api.publication_controller import PublicationSettingView
+from api.stats_controller import StatsDailyView
 
 urlpatterns = [
     path("votes", VoteView.as_view(), name="create_vote"),
     path("publication/<str:userId>", PublicationSettingView.as_view(), name="publication_setting"),
+    path("stats/votes/daily/<str:userId>", StatsDailyView.as_view(), name="stats_daily"),
 ]
