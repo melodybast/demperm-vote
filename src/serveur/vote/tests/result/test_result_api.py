@@ -23,7 +23,7 @@ def _create_test_votes():
     driver = get_driver()
     with driver.session() as session:
         # Votes pour le domaine "tech"
-        # User1 reçoit 100 votes (10 jours)
+        # User1 reçoit 100 votes
         session.run(
             """
             MERGE (v1:User {id: 'voter-1'})
@@ -36,7 +36,7 @@ def _create_test_votes():
             date=(datetime.now() - timedelta(days=10)).isoformat()
         )
         
-        # User2 reçoit 50 votes (5 jours)
+        # User2 reçoit 50 votes
         session.run(
             """
             MERGE (v2:User {id: 'voter-2'})
@@ -49,7 +49,7 @@ def _create_test_votes():
             date=(datetime.now() - timedelta(days=5)).isoformat()
         )
         
-        # User3 reçoit 25 votes (15 jours)
+        # User3 reçoit 25 votes
         session.run(
             """
             MERGE (v3:User {id: 'voter-3'})
@@ -63,7 +63,7 @@ def _create_test_votes():
         )
         
         # Votes pour le domaine "design"
-        # User4 reçoit 80 votes (8 jours)
+        # User4 reçoit 80 votes
         session.run(
             """
             MERGE (v4:User {id: 'voter-4'})
@@ -76,7 +76,7 @@ def _create_test_votes():
             date=(datetime.now() - timedelta(days=8)).isoformat()
         )
         
-        # User5 reçoit 30 votes (3 jours)
+        # User5 reçoit 30 votes
         session.run(
             """
             MERGE (v5:User {id: 'voter-5'})
@@ -102,6 +102,7 @@ def test_get_results_unauthorized():
 def test_get_results_all_domains():
     """
     Test que GET /results retourne tous les résultats sans filtre.
+    Vérifie aussi la logique d'élection (≥20% des voix du domaine).
     """
     _cleanup_neo4j()
     _create_test_votes()
@@ -128,7 +129,27 @@ def test_get_results_all_domains():
     assert data[0]["count"] == 100
     assert data[0]["userId"] == "user-tech-1"
     assert data[0]["domain"] == "tech"
-    assert data[0]["elected"] is True
+    
+    # Vérifier la logique d'élection
+    # Domaine "tech" : 100 + 50 + 25 = 175 votes total
+    # - user-tech-1 : 100/175 = 57% ✓ élu (≥20%)
+    # - user-tech-2 : 50/175 = 29% ✓ élu (≥20%)
+    # - user-tech-3 : 25/175 = 14% ✗ non élu (<20%)
+    # Domaine "design" : 80 + 30 = 110 votes total
+    # - user-design-1 : 80/110 = 73% ✓ élu (≥20%)
+    # - user-design-2 : 30/110 = 27% ✓ élu (≥20%)
+    
+    for result in data:
+        if result["userId"] == "user-tech-1":
+            assert result["elected"] is True, "user-tech-1 devrait être élu (57%)"
+        elif result["userId"] == "user-tech-2":
+            assert result["elected"] is True, "user-tech-2 devrait être élu (29%)"
+        elif result["userId"] == "user-tech-3":
+            assert result["elected"] is False, "user-tech-3 ne devrait PAS être élu (14%)"
+        elif result["userId"] == "user-design-1":
+            assert result["elected"] is True, "user-design-1 devrait être élu (73%)"
+        elif result["userId"] == "user-design-2":
+            assert result["elected"] is True, "user-design-2 devrait être élu (27%)"
 
 
 def test_get_results_filter_by_domain():
@@ -160,6 +181,13 @@ def test_get_results_filter_by_domain():
     assert data[0]["count"] == 100
     assert data[1]["count"] == 50
     assert data[2]["count"] == 25
+    
+    # Vérifier la logique d'élection pour le domaine "tech"
+    # Total : 175 votes (100 + 50 + 25)
+    # Seuil 20% : 35 votes
+    assert data[0]["elected"] is True  # 100 votes (57%)
+    assert data[1]["elected"] is True  # 50 votes (29%)
+    assert data[2]["elected"] is False  # 25 votes (14%, < 20%)
 
 
 def test_get_results_with_top_limit():
@@ -186,6 +214,13 @@ def test_get_results_with_top_limit():
     # Les 2 premiers doivent être user-tech-1 (100) et user-design-1 (80)
     assert data[0]["count"] == 100
     assert data[1]["count"] == 80
+    
+    # Note : avec top=2, on a seulement 2 résultats mais de domaines différents
+    # Le calcul des 20% se fait quand même sur TOUS les votes du domaine
+    # user-tech-1 : 100/175 (tech total) = 57% ✓ élu
+    # user-design-1 : 80/110 (design total) = 73% ✓ élu
+    assert data[0]["elected"] is True
+    assert data[1]["elected"] is True
 
 
 def test_get_results_with_since_filter():
@@ -297,3 +332,82 @@ def test_get_results_empty_database():
     
     assert len(data) == 0
     assert isinstance(data, list)
+
+
+def test_election_threshold_20_percent():
+    """
+    Test spécifique de la logique d'élection : 
+    Élu si ≥ 20% des voix du domaine (membre du Conseil municipal).
+    
+    Scénario :
+    - Domaine A : 4 personnes avec 100, 30, 20, 10 votes (total: 160)
+      * 100/160 = 62.5% ✓ élu
+      * 30/160 = 18.75% ✗ non élu (< 20%)
+      * 20/160 = 12.5% ✗ non élu
+      * 10/160 = 6.25% ✗ non élu
+    """
+    _cleanup_neo4j()
+    
+    driver = get_driver()
+    with driver.session() as session:
+        # Créer 4 personnes dans le domaine "test"
+        session.run("""
+            MERGE (v1:User {id: 'voter-1'})
+            MERGE (t1:User {id: 'candidate-1'})
+            MERGE (v1)-[r:VOTED {domain: 'test'}]->(t1)
+            SET r.id = 'vote-1', r.count = 100, r.createdAt = datetime()
+        """)
+        
+        session.run("""
+            MERGE (v2:User {id: 'voter-2'})
+            MERGE (t2:User {id: 'candidate-2'})
+            MERGE (v2)-[r:VOTED {domain: 'test'}]->(t2)
+            SET r.id = 'vote-2', r.count = 30, r.createdAt = datetime()
+        """)
+        
+        session.run("""
+            MERGE (v3:User {id: 'voter-3'})
+            MERGE (t3:User {id: 'candidate-3'})
+            MERGE (v3)-[r:VOTED {domain: 'test'}]->(t3)
+            SET r.id = 'vote-3', r.count = 20, r.createdAt = datetime()
+        """)
+        
+        session.run("""
+            MERGE (v4:User {id: 'voter-4'})
+            MERGE (t4:User {id: 'candidate-4'})
+            MERGE (v4)-[r:VOTED {domain: 'test'}]->(t4)
+            SET r.id = 'vote-4', r.count = 10, r.createdAt = datetime()
+        """)
+    
+    client = APIClient()
+    auth_header = "Bearer test-user"
+    
+    response = client.get("/results?domain=test", HTTP_AUTHORIZATION=auth_header)
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    assert len(data) == 4
+    
+    # Total : 160 votes
+    # Seuil 20% : 32 votes
+    
+    # candidate-1 : 100 votes (62.5%) ✓ élu
+    assert data[0]["userId"] == "candidate-1"
+    assert data[0]["count"] == 100
+    assert data[0]["elected"] is True
+    
+    # candidate-2 : 30 votes (18.75%) ✗ non élu
+    assert data[1]["userId"] == "candidate-2"
+    assert data[1]["count"] == 30
+    assert data[1]["elected"] is False
+    
+    # candidate-3 : 20 votes (12.5%) ✗ non élu
+    assert data[2]["userId"] == "candidate-3"
+    assert data[2]["count"] == 20
+    assert data[2]["elected"] is False
+    
+    # candidate-4 : 10 votes (6.25%) ✗ non élu
+    assert data[3]["userId"] == "candidate-4"
+    assert data[3]["count"] == 10
+    assert data[3]["elected"] is False

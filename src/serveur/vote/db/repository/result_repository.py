@@ -48,25 +48,15 @@ class ResultRepository:
         """
         Transaction de lecture pour récupérer les résultats agrégés.
         
-        La requête :
-        1. Match toutes les relations VOTED vers les utilisateurs cibles
-        2. Filtre par domaine si spécifié
-        3. Filtre par date si spécifié
-        4. Agrège les votes par (targetUserId, domain)
-        5. Trie par count décroissant
-        6. Limite aux top N résultats
+        Cette fonction utilise 2 requêtes pour éviter le bug du calcul
+        des 20% avec le paramètre top :
+        1. Calcul des totaux par domaine (sur TOUS les votes)
+        2. Récupération des top N candidats avec leur domainTotal
         """
         
-        # Construction de la requête Cypher
-        query = """
-            MATCH (voter:User)-[v:VOTED]->(target:User)
-        """
-        
-        # Ajout des conditions WHERE
+        # Paramètres communs
+        params = {"top": top}
         conditions = []
-        params = {
-            "top": top
-        }
         
         if domain:
             conditions.append("v.domain = $domain")
@@ -76,33 +66,46 @@ class ResultRepository:
             conditions.append("v.createdAt >= datetime($since)")
             params["since"] = since.isoformat()
         
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
+        where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
         
-        # Agrégation et tri
-        query += """
-            WITH target.id AS userId,
-                 v.domain AS domain,
-                 sum(v.count) AS totalCount,
-                 min(v.createdAt) AS firstVoteAt
-            ORDER BY totalCount DESC
-            LIMIT $top
-            RETURN userId,
-                   domain,
-                   totalCount AS count,
-                   true AS elected,
-                   firstVoteAt AS electedAt
+        # ═══════════════════════════════════════════════════════════════
+        # REQUÊTE 1 : Calculer les totaux par domaine
+        # ═══════════════════════════════════════════════════════════════
+        query_totals = f"""
+            MATCH (voter:User)-[v:VOTED]->(target:User)
+            {where_clause}
+            RETURN v.domain AS domain, sum(v.count) AS domainTotal
         """
         
-        result = tx.run(query, **params)
+        result_totals = tx.run(query_totals, **params)
+        domain_totals = {record["domain"]: record["domainTotal"] for record in result_totals}
         
+        # ═══════════════════════════════════════════════════════════════
+        # REQUÊTE 2 : Récupérer les top N candidats
+        # ═══════════════════════════════════════════════════════════════
+        query_results = f"""
+            MATCH (voter:User)-[v:VOTED]->(target:User)
+            {where_clause}
+            WITH target.id AS userId,
+                 v.domain AS domain,
+                 sum(v.count) AS userVotes,
+                 min(v.createdAt) AS firstVoteAt
+            ORDER BY userVotes DESC
+            LIMIT $top
+            RETURN userId, domain, userVotes AS count, firstVoteAt AS electedAt
+        """
+        
+        result_users = tx.run(query_results, **params)
+        
+        # Construire les résultats avec le domainTotal
         results = []
-        for record in result:
+        for record in result_users:
+            user_domain = record["domain"]
             results.append({
                 "userId": record["userId"],
-                "domain": record["domain"],
+                "domain": user_domain,
                 "count": record["count"],
-                "elected": record["elected"],
+                "domainTotal": domain_totals.get(user_domain, 0),
                 "electedAt": record["electedAt"]
             })
         
