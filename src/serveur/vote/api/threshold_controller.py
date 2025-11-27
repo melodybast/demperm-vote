@@ -1,3 +1,10 @@
+from drf_spectacular.utils import (
+    extend_schema,
+    OpenApiResponse,
+    OpenApiParameter,
+    OpenApiTypes,
+)
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -10,17 +17,26 @@ from core.services.threshold_service import ThresholdService
 class ThresholdSettingView(APIView):
     """
     GET /threshold/{userId}
-    Récupère le seuil de publication d'un utilisateur.
-    
     PUT /threshold/{userId}
-    Met à jour le seuil de publication d'un utilisateur.
-    Returns:
-            200: ThresholdSetting mis à jour
-            400: Requête invalide
-            401: Non autorisé
-            403: Interdit (si l'utilisateur tente de modifier un autre compte)
     """
-
+    
+    @extend_schema(
+        tags=["Preferences"],
+        parameters=[
+            OpenApiParameter(
+                name="userId",
+                description="ID de l'utilisateur dont on souhaite récupérer le seuil",
+                required=True,
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.PATH,
+            )
+        ],
+        responses={
+            200: ThresholdSettingSerializer,
+            401: OpenApiResponse(description="Unauthorized"),
+        },
+        description="Récupère le seuil de publication d'un utilisateur.",
+    )
     def get(self, request, userId):
         # Vérification de l'authentification
         user = getattr(request, "user", None)
@@ -37,6 +53,26 @@ class ThresholdSettingView(APIView):
         
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(
+        tags=["Preferences"],
+        parameters=[
+            OpenApiParameter(
+                name="userId",
+                description="ID de l'utilisateur dont on souhaite modifier le seuil",
+                required=True,
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.PATH,
+            )
+        ],
+        request=ThresholdUpdateRequestSerializer,
+        responses={
+            200: ThresholdSettingSerializer,
+            400: OpenApiResponse(description="Requête invalide"),
+            401: OpenApiResponse(description="Unauthorized"),
+            403: OpenApiResponse(description="Forbidden: cannot modify another user's settings"),
+        },
+        description="Met à jour le seuil de publication de l’utilisateur authentifié.",
+    )
     def put(self, request, userId):
         # Vérification de l'authentification
         user = getattr(request, "user", None)
