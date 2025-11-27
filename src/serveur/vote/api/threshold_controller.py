@@ -16,8 +16,8 @@ from core.services.threshold_service import ThresholdService
 
 class ThresholdSettingView(APIView):
     """
-    GET /threshold/{userId}
-    PUT /threshold/{userId}
+    GET /api/threshold/{userId}
+    PUT /api/threshold/{userId}
     """
     
     @extend_schema(

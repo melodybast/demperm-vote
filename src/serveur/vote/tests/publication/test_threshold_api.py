@@ -19,19 +19,19 @@ def _cleanup_neo4j_user(user_id: str):
 
 def test_get_threshold_setting_unauthorized():
     """
-    Test que GET /threshold/{userId} retourne 403 sans authentification.
+    Test que GET /api/threshold/{userId} retourne 403 sans authentification.
     """
     client = APIClient()
     user_id = "test-user-threshold-get-unauth"
 
-    response = client.get(f"/threshold/{user_id}")
+    response = client.get(f"/api/threshold/{user_id}")
 
     assert response.status_code == 403
 
 
 def test_get_threshold_setting_default_value():
     """
-    Test que GET /threshold/{userId} retourne threshold=100 par défaut
+    Test que GET /api/threshold/{userId} retourne threshold=100 par défaut
     pour un nouvel utilisateur.
     """
     client = APIClient()
@@ -42,7 +42,7 @@ def test_get_threshold_setting_default_value():
 
     auth_header = f"Bearer {user_id}"
     response = client.get(
-        f"/threshold/{user_id}",
+        f"/api/threshold/{user_id}",
         HTTP_AUTHORIZATION=auth_header,
     )
 
@@ -57,13 +57,13 @@ def test_get_threshold_setting_default_value():
 
 def test_put_threshold_setting_unauthorized():
     """
-    Test que PUT /threshold/{userId} retourne 403 sans authentification.
+    Test que PUT /api/threshold/{userId} retourne 403 sans authentification.
     """
     client = APIClient()
     user_id = "test-user-threshold-put-unauth"
 
     payload = {"threshold": 50}
-    response = client.put(f"/threshold/{user_id}", payload, format="json")
+    response = client.put(f"/api/threshold/{user_id}", payload, format="json")
 
     assert response.status_code == 403
 
@@ -81,7 +81,7 @@ def test_put_threshold_setting_forbidden_other_user():
     payload = {"threshold": 50}
     
     response = client.put(
-        f"/threshold/{other_user_id}",
+        f"/api/threshold/{other_user_id}",
         payload,
         format="json",
         HTTP_AUTHORIZATION=auth_header,
@@ -93,7 +93,7 @@ def test_put_threshold_setting_forbidden_other_user():
 
 def test_put_threshold_setting_invalid_data():
     """
-    Test que PUT /threshold/{userId} retourne 400 si les données sont invalides.
+    Test que PUT /api/threshold/{userId} retourne 400 si les données sont invalides.
     """
     client = APIClient()
     user_id = "test-user-threshold-put-invalid"
@@ -103,7 +103,7 @@ def test_put_threshold_setting_invalid_data():
     # Test 1: threshold manquant
     payload = {}
     response = client.put(
-        f"/threshold/{user_id}",
+        f"/api/threshold/{user_id}",
         payload,
         format="json",
         HTTP_AUTHORIZATION=auth_header,
@@ -113,7 +113,7 @@ def test_put_threshold_setting_invalid_data():
     # Test 2: threshold négatif
     payload = {"threshold": -10}
     response = client.put(
-        f"/threshold/{user_id}",
+        f"/api/threshold/{user_id}",
         payload,
         format="json",
         HTTP_AUTHORIZATION=auth_header,
@@ -123,7 +123,7 @@ def test_put_threshold_setting_invalid_data():
 
 def test_put_threshold_setting_success_and_persisted():
     """
-    Test que PUT /threshold/{userId} met à jour correctement le seuil
+    Test que PUT /api/threshold/{userId} met à jour correctement le seuil
     et le persiste dans Neo4j.
     """
     client = APIClient()
@@ -137,7 +137,7 @@ def test_put_threshold_setting_success_and_persisted():
     # 1. Mise à jour à 50
     payload = {"threshold": 50}
     response = client.put(
-        f"/threshold/{user_id}",
+        f"/api/threshold/{user_id}",
         payload,
         format="json",
         HTTP_AUTHORIZATION=auth_header,
@@ -165,7 +165,7 @@ def test_put_threshold_setting_success_and_persisted():
     # 3. Mise à jour à 200
     payload = {"threshold": 200}
     response = client.put(
-        f"/threshold/{user_id}",
+        f"/api/threshold/{user_id}",
         payload,
         format="json",
         HTTP_AUTHORIZATION=auth_header,
@@ -204,7 +204,7 @@ def test_get_threshold_setting_after_update():
     # 1. Mise à jour à 75
     payload = {"threshold": 75}
     put_response = client.put(
-        f"/threshold/{user_id}",
+        f"/api/threshold/{user_id}",
         payload,
         format="json",
         HTTP_AUTHORIZATION=auth_header,
@@ -213,7 +213,7 @@ def test_get_threshold_setting_after_update():
 
     # 2. Récupération via GET
     get_response = client.get(
-        f"/threshold/{user_id}",
+        f"/api/threshold/{user_id}",
         HTTP_AUTHORIZATION=auth_header,
     )
     assert get_response.status_code == 200
@@ -238,7 +238,7 @@ def test_put_threshold_setting_zero_is_valid():
     # Mise à jour à 0
     payload = {"threshold": 0}
     response = client.put(
-        f"/threshold/{user_id}",
+        f"/api/threshold/{user_id}",
         payload,
         format="json",
         HTTP_AUTHORIZATION=auth_header,

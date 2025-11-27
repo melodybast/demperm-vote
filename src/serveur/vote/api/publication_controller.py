@@ -16,8 +16,8 @@ from core.services.publication_service import PublicationService
 
 class PublicationSettingView(APIView):
     """
-    GET /publication/{userId}
-    PUT /publication/{userId}
+    GET /api/publication/{userId}
+    PUT /api/publication/{userId}
     """
 
     @extend_schema(

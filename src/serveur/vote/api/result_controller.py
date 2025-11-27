@@ -17,7 +17,7 @@ from core.services.result_service import ResultService
 
 class ResultView(APIView):
     """
-    GET /results
+    GET /api/results
     """
 
     @extend_schema(

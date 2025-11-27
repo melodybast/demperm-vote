@@ -16,7 +16,7 @@ from core.services.vote_validation_service import VoteValidationService
 
 class VoteView(APIView):
     """
-    POST /votes
+    POST /api/votes
     """
 
     @extend_schema(
@@ -57,7 +57,7 @@ class VoteView(APIView):
 
 class VoteDeleteView(APIView):
     """
-    DELETE /votes/{domain}
+    DELETE /api/votes/{domain}
     """
 
     @extend_schema(
@@ -103,7 +103,7 @@ class VoteDeleteView(APIView):
 
 class VotesByVoterView(APIView):
     """
-    GET /votes/by-user/{userId}
+    GET /api/votes/by-user/{userId}
     """
 
     @extend_schema(
@@ -147,7 +147,7 @@ class VotesByVoterView(APIView):
 
 class VotesByVoterMeView(APIView):
     """
-    GET /votes/by-voter/me
+    GET /api/votes/by-voter/me
     """
     
     @extend_schema(
@@ -187,7 +187,7 @@ class VotesByVoterMeView(APIView):
 
 class VotesForUserView(APIView):
     """
-    GET /votes/for-user/{userId}
+    GET /api/votes/for-user/{userId}
     """
 
     @extend_schema(
@@ -231,7 +231,7 @@ class VotesForUserView(APIView):
 
 class VotesForUserMeView(APIView):
     """
-    GET /votes/for-user/me
+    GET /api/votes/for-user/me
     """
     
     @extend_schema(
@@ -270,7 +270,7 @@ class VotesForUserMeView(APIView):
 
 class VoteValidationView(APIView):
     """
-    GET /votes/validate/force
+    GET /api/votes/validate/force
     """
     
     @extend_schema(
